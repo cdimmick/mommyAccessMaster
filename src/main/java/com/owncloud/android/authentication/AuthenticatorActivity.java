@@ -206,7 +206,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
 
     /// Server PRE-Fragment elements 
-    private CustomEditText mHostUrlInput;
     private View mRefreshButton;
     private TextView mServerStatusView;
 
@@ -276,6 +275,15 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
             getSupportActionBar().setDisplayShowHomeEnabled(false);
             getSupportActionBar().setDisplayShowTitleEnabled(false);
         }
+
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                checkOcServer();
+            }
+        }, 2000);
+
+
 
         mIsFirstAuthAttempt = true;
 
@@ -455,8 +463,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
                                 initServerPreFragment(null);
 
-                                mHostUrlInput.setText(baseURL);
-
                                 checkOcServer();
                             }
                         }).show();
@@ -483,7 +489,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
             LoginUrlInfo loginUrlInfo = parseLoginDataUrl(prefix, dataString);
 
             if (loginUrlInfo != null) {
-                mHostUrlInput.setText(loginUrlInfo.serverAddress);
                 mUsernameInput.setText(loginUrlInfo.username);
                 mPasswordInput.setText(loginUrlInfo.password);
 
@@ -572,7 +577,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
      * Configures elements in the user interface under direct control of the Activity.
      */
     private void initOverallUi() {
-        mHostUrlInput = (CustomEditText) findViewById(R.id.hostUrlInput);
         mUsernameInputLayout = (TextInputLayout) findViewById(R.id.input_layout_account_username);
         mPasswordInputLayout = (TextInputLayout) findViewById(R.id.input_layout_account_password);
         mPasswordInput = (EditText) findViewById(R.id.account_password);
@@ -665,13 +669,9 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
         if (!webViewLoginMethod) {
             /// step 2 - set properties of UI elements (text, visibility, enabled...)
-            mHostUrlInput = (CustomEditText) findViewById(R.id.hostUrlInput);
             // Convert IDN to Unicode
-            mHostUrlInput.setText(DisplayUtils.convertIdn(mServerInfo.mBaseUrl, false));
             if (mAction != ACTION_CREATE) {
                 /// lock things that should not change
-                mHostUrlInput.setEnabled(false);
-                mHostUrlInput.setFocusable(false);
             }
             if (isUrlInputAllowed) {
                 mRefreshButton = findViewById(R.id.embeddedRefreshButton);
@@ -683,10 +683,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
                     mWaitingForOpId > Integer.MAX_VALUE);
             mServerStatusView = (TextView) findViewById(R.id.server_status_text);
             showServerStatus();
-
-            /// step 3 - bind some listeners and options
-            mHostUrlInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-            mHostUrlInput.setOnEditorActionListener(this);
 
             /// step 4 - create listeners that will be bound at onResume
             mHostUrlInputWatcher = new TextWatcher() {
@@ -724,8 +720,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
                     if (event.getAction() == MotionEvent.ACTION_DOWN &&
                             AccountTypeUtils
                                     .getAuthTokenTypeSamlSessionCookie(MainApp
-                                            .getAccountType()).equals(mAuthTokenType) &&
-                            mHostUrlInput.hasFocus()) {
+                                            .getAccountType()).equals(mAuthTokenType) ) {
                         checkOcServer();
                     }
                     return false;
@@ -954,8 +949,6 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
         if (!webViewLoginMethod) {
             // bound here to avoid spurious changes triggered by Android on device rotations
-            mHostUrlInput.setOnFocusChangeListener(this);
-            mHostUrlInput.addTextChangedListener(mHostUrlInputWatcher);
 
             if (mNewCapturedUriFromOAuth2Redirection != null) {
                 getOAuth2AccessTokenFromCapturedRedirection();
@@ -996,10 +989,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
             mOperationsServiceBinder.removeOperationListener(this);
         }
 
-        if (!webViewLoginMethod) {
-            mHostUrlInput.removeTextChangedListener(mHostUrlInputWatcher);
-            mHostUrlInput.setOnFocusChangeListener(null);
-        }
+
 
         super.onPause();
     }
@@ -1082,7 +1072,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
      */
     private void onUrlInputFocusLost() {
         if (!mServerInfo.mBaseUrl.equals(
-                AuthenticatorUrlUtils.normalizeUrl(mHostUrlInput.getText().toString(), mServerInfo.mIsSslConn))) {
+                AuthenticatorUrlUtils.normalizeUrl("", mServerInfo.mIsSslConn))) {
             // check server again only if the user changed something in the field
             checkOcServer();
         } else {
@@ -1093,24 +1083,16 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
 
     private void checkOcServer() {
-        String uri;
-        if (mHostUrlInput != null) {
-            uri = mHostUrlInput.getText().toString().trim();
-            mOkButton.setEnabled(false);
-            showRefreshButton(false);
-        } else {
-            uri = mServerInfo.mBaseUrl;
-        }
+        String uri = mServerInfo.mBaseUrl;
+
 
         mServerIsValid = false;
         mServerIsChecked = false;
         mServerInfo = new GetServerInfoOperation.ServerInfo();
 
         if (uri.length() != 0) {
-            if (mHostUrlInput != null) {
                 uri = AuthenticatorUrlUtils.stripIndexPhpOrAppsFiles(uri);
-                mHostUrlInput.setText(uri);
-            }
+
 
             // Handle internationalized domain names
             try {
@@ -1119,11 +1101,10 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
                 // Let Owncloud library check the error of the malformed URI
             }
 
-            if (mHostUrlInput != null) {
                 mServerStatusText = getResources().getString(R.string.auth_testing_connection);
                 mServerStatusIcon = R.drawable.progress_small;
                 showServerStatus();
-            }
+
 
             Intent getServerInfoIntent = new Intent();
             getServerInfoIntent.setAction(OperationsService.ACTION_GET_SERVER_INFO);
@@ -1506,13 +1487,8 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
             case OK_NO_SSL:
             case OK:
-                if (mHostUrlInput.getText().toString().trim().toLowerCase().startsWith(HTTP_PROTOCOL)) {
                     mServerStatusText = getResources().getString(R.string.auth_connection_established);
                     mServerStatusIcon = R.drawable.ic_ok;
-                } else {
-                    mServerStatusText = getResources().getString(R.string.auth_nossl_plain_ok_title);
-                    mServerStatusIcon = R.drawable.ic_lock_open_white;
-                }
                 break;
 
             case NO_NETWORK_CONNECTION:
@@ -1591,13 +1567,8 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
 
             case OK_NO_SSL:
             case OK:
-                if (mHostUrlInput.getText().toString().trim().toLowerCase().startsWith(HTTP_PROTOCOL)) {
                     mAuthStatusText = getResources().getString(R.string.auth_connection_established);
                     mAuthStatusIcon = R.drawable.ic_ok;
-                } else {
-                    mAuthStatusText = getResources().getString(R.string.auth_nossl_plain_ok_title);
-                    mAuthStatusIcon = R.drawable.ic_lock_open_white;
-                }
                 break;
 
             case NO_NETWORK_CONNECTION:
@@ -2051,10 +2022,8 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
                 mOkButton.performClick();
             }
 
-        } else if (actionId == EditorInfo.IME_ACTION_NEXT && inputField != null &&
-                inputField.equals(mHostUrlInput)) {
-            checkOcServer();
         }
+
         return false;   // always return false to grant that the software keyboard is hidden anyway
     }
 
@@ -2132,7 +2101,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
     public boolean onTouchEvent(MotionEvent event) {
         if (AccountTypeUtils.getAuthTokenTypeSamlSessionCookie(MainApp.getAccountType()).
                 equals(mAuthTokenType) &&
-                mHostUrlInput.hasFocus() && event.getAction() == MotionEvent.ACTION_DOWN) {
+                 event.getAction() == MotionEvent.ACTION_DOWN) {
             checkOcServer();
         }
         return super.onTouchEvent(event);
@@ -2209,10 +2178,7 @@ public class AuthenticatorActivity extends AccountAuthenticatorActivity
             mOperationsServiceBinder.dispatchResultIfFinished((int) mWaitingForOpId, this);
         }
 
-        if (!webViewLoginMethod && mHostUrlInput.getText() != null && mHostUrlInput.getText().length() > 0
-                && !mServerIsChecked) {
             checkOcServer();
-        }
     }
 
 

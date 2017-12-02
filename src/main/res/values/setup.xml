@@ -45,7 +45,6 @@
     <integer name="contacts_backup_expire">-1</integer>
 
     <!-- What's new -->
-    <bool name="show_whats_new">true</bool>
     <!-- To fill if you want to show webviews instead of regular welcome views -->
     <array name="whatsnew_urls"></array>
 
